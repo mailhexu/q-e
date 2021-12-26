@@ -213,12 +213,15 @@
   !! INTEGER components of the ir-th Wigner-Seitz grid point for phonons
   INTEGER, ALLOCATABLE :: irvec_g(:, :)
   !! INTEGER components of the ir-th Wigner-Seitz grid point for electron-phonon
-  INTEGER, ALLOCATABLE :: ndegen_k(:, :, :)
+  INTEGER, ALLOCATABLE :: ndegen_k(:, :, :) 
+  !!  ndegen_k(nrr_k, dims, dims)
   !! Wigner-Seitz number of degenerescence (weights) for the electrons grid
   INTEGER, ALLOCATABLE :: ndegen_q(:, :, :)
   !! Wigner-Seitz weights for the phonon grid that depend on atomic positions $R + \tau(nb) - \tau(na)$
+  !!  ndegen_q(nrr_q, dims2, dims2)
   INTEGER, ALLOCATABLE :: ndegen_g(:, :, :)
   !! Wigner-Seitz weights for the electron-phonon grid that depend on
+  !!  ndegen_g( dims, nrr_g,dims2)
   !! atomic positions $R - \tau(na)$
   INTEGER, ALLOCATABLE :: selecq(:)
   !! Selected q-points within the fsthick window
@@ -315,6 +318,10 @@
   !! Used to store $e^{2\pi r \cdot k+q}$ exponential
   COMPLEX(KIND = DP), ALLOCATABLE :: vmefp(:, :, :)
   !! Phonon velocity
+
+  INTEGER :: idim1, idim2
+  !! counters for dims
+  INTEGER :: WSFILE
   !
   CALL start_clock('ephwann')
   !
@@ -383,11 +390,65 @@
                            ndegen_k, ndegen_q, ndegen_g, wslen_k, wslen_q, wslen_g, &
                            dummy, dims, dummy, dims2)
   ENDIF
-  !
-  ! Determine the size of the respective WS sets based on the length of the matrices
+  ! Writting Weiger-Seitz vectors and degeneracy
   nrr_k = SIZE(irvec_k(1, :))
   nrr_q = SIZE(irvec_q(1, :))
   nrr_g = SIZE(irvec_g(1, :))
+
+  !   WRITE(stdout, '(5x,a)' ) 'WS vectors and degeneracies written to disk for use in elphbolt.'
+  WSFILE=999
+  if(mpime==ionode_id) then
+     open(unit=WSFILE,file='WSVecDeg.dat',status='replace')
+      write(WSFILE, "((a6,3x,I4, 7x))") "dims =", dims
+      write(WSFILE, "((a6,3x,I4, 7x))") "dims2=", dims2
+      write(WSFILE, "((a6,3x,I4, 7x))") "nrr_k=", nrr_k
+      write(WSFILE, "((a6,3x,I4, 7x))") "nrr_q=", nrr_q
+      write(WSFILE, "((a6,3x,I4, 7x))") "nrr_g=", nrr_g
+
+     write(WSFILE, "(a12)") "Rk(3,nrr_k):"
+     do ir=1,nrr_k
+        write(WSFILE,"(3(I10,x))") irvec_k(:,ir)
+     end do
+     write(WSFILE, "(a12)") "Rg(3,nrr_q):"
+     do ir=1,nrr_q
+        write(WSFILE,"(3(I10,x))") irvec_q(:,ir)
+     end do
+     write(WSFILE, "(a12)") "Rg(3,nrr_g):"
+     do ir=1,nrr_g
+        write(WSFILE,"(3(I10,x))") irvec_g(:,ir)
+     end do
+
+
+     write(WSFILE, "(a26)") "ndegen_k(dims,dims,nrr_k):"
+     do idim2=1, dims
+        do idim1=1, dims
+           do ir=1,nrr_k
+             write(WSFILE,"(1(I10,x))") ndegen_k(ir,idim1,idim2)
+           end do
+        end do
+     end do
+
+
+     write(WSFILE, "(a26)") "ndegen_q(dims,dims,nrr_q):"
+
+     do idim2=1, dims2
+        do idim1=1, dims2
+           do ir=1,nrr_q
+             write(WSFILE,"(1(I10,x))") ndegen_q(ir,idim1,idim2)
+           end do
+        end do
+     end do
+
+     write(WSFILE, "(a26)") "ndegen_g(dims,nrr_q,dims2):"
+     do idim2=1, dims2
+        do ir=1,nrr_g
+           do idim1=1, dims
+             write(WSFILE,"(1(I10,x))") ndegen_g(idim1, ir, idim2)
+           end do
+        end do
+     end do
+  end if
+  !
   IF (use_ws) THEN
     WRITE(stdout, '(5x,a)' )    'Construct the Wigner-Seitz cell using Wannier centers and atomic positions '
     WRITE(stdout, '(5x,a,i8)' ) 'Number of WS vectors for electrons ',nrr_k
